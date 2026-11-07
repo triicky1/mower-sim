@@ -1,3 +1,27 @@
+# Environment variables
 .env
+
+# Python compilation artifacts
 **/__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest artifacts och konfigurationer
+.pytest_cache/
+.tox/
+.nox/
+pytest.ini
+
+# Build and report artifacts
 **/*.pdf
+extra/
+
+# IDE and Editor configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
