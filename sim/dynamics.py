@@ -93,7 +93,7 @@ class VehicleDynamics:
         starttiden t0, och begränsas uppåt av arbetshastigheten v_work.
         """
         veh = self.params
-        vref = veh.v_work if vref is None else vref
+        vref = vref or veh.v_work
         return (
             min(veh.a_max * (t - veh.t0), vref)
             if vref > 0.0 else

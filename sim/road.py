@@ -6,7 +6,7 @@ from .types import RoadSegment
 
 
 class RoadProfile:
-    """Simulationskompatibel färdbana i 2D.
+    """Simulation-compatible 2D road profile.
 
     RoadProfile((length_m, slope_deg[, vref_mps]), ...)
     """
@@ -38,7 +38,7 @@ class RoadProfile:
         return self.vrefs[self._index(s)]
 
     def elevation(self, s: float, y0: float = 0.0) -> float:
-        """Beräknar vägbanans höjd y vid tillryggalagd sträcka s."""
+        """Calculates the road elevation y at traveled distance s."""
         if s < 0.0:
             return float(y0 + s * self.dy[0])
         k = self._index(s)

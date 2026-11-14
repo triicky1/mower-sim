@@ -23,68 +23,69 @@ def step_method(
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
 ) -> EulerSim:
-    """Euler stegmetod för fordon med likströmsmotor."""
-    ART = open("figures/.wojak", encoding="utf-8").read()
-    print_welcome(settings, sensor if isinstance(sensor, AMT102VSensor) else None, art=ART)
+    """Euler step method for vehicle with DC motor."""
 
     t0, tf, dt = settings.t0, settings.tf, settings.dt
     x0, y0, α0, v0, a0 = settings.x0, settings.y0, settings.α0, settings.v0, settings.a0
     Kp, Ki, Kd, n_ctrl = settings.Kp, settings.Ki, settings.Kd, settings.n_ctrl
     r, i2or = settings.r, settings.i2or
     lo_nom, hi_nom = settings.get_control_limits(mode, 0)
+    vref = settings.vref or settings.v_work
+    deramp_ref = VehicleDynamics(settings).deramp_ref
     ramp_ref = VehicleDynamics(settings).ramp_ref
 
-    # TODO: Make controller optional...
-    # TODO: Make sensor optional... (pass both explicitly)
+    N = round((tf - t0)/dt)             # Number of steps
+    Ts = n_ctrl * dt                    # Controller sample time
 
-    N = round((tf - t0)/dt)             # Antal steg
-    Ts = n_ctrl * dt                    # Regulatorns sampeltid
+    manual = True if not sensor and not controller else False
 
+    # controller: True -> Default, False -> None
     if controller is True:
         controller = Controller(Kp, Ki, Kd, Ts)
+    elif isinstance(controller, Controller):
+        controller.reset()
 
-    # https://www.digikey.se/sv/products/detail/same-sky-formerly-cui-devices/AMT102-V/827015
-    if sensor is True:
-        # Initialisera default sensor
-        sensor = AMT102VSensor(
-            PPR=2048,
-            wheel_radius=r,
-            gear_ratio=i2or,
-            sample_rate_hz=1 / dt,
-        )
-    elif isinstance(sensor, AMT102VSensor):
-        # Nollställ given sensor
+    # Sensor: True -> Default, False -> Disable quantization
+    if isinstance(sensor, AMT102VSensor):
         sensor.reset()
+    else:
+        sensor = AMT102VSensor(wheel_radius=r, gear_ratio=i2or, enable_quantization=sensor)
 
-    # Initialisera tomma vektorer att spara stegen i
+    # Initialize empty vectors to store the steps in
     t = np.linspace(t0, tf, N+1)
     s, x, y, α, v, vm, vr, a, Ia, Ua, Fd = np.zeros((11, N + 1))
     x[0], y[0], α[0], v[0], a[0] = x0, y0, α0, v0, a0
 
     cmd = 0.0
 
-    # Påbörja Eulers steg metod
-    for k in range(N + 1):
-        # TODO: Lägg till önskade hastigheter i RoadProfile segmenten
-        α[k] = road.slope(s[k])
-        vr[k] = ramp_ref(t[k])
+    print_welcome(settings, controller or None, sensor or None)
 
-        # Sensorn avläses "kontinuerligt" (varje steg) om inte satt till False
+    # Start Euler's step method
+    for k in range(N + 1):
+        α[k] = road.slope(s[k])
+
+        # TODO: Change back to default after testing
+        t_break = tf * 0.9
+        if t[k] > t_break:
+            vr[k] = max(vref - settings.a_max * (t[k]-t_break), 0)
+        else:
+            vr[k] = ramp_ref(t[k]) if not manual else vref # default
+
+        # The sensor is read "continuously" (every step) unless set to False
         vm[k] = sensor.measure_velocity(v[k], t[k]) if sensor else v[k]
 
         lo, hi = settings.get_control_limits(mode, v[k])
 
-        if controller:
-            # Nytt regulator sampel
-            if k % n_ctrl == 0:
-                cmd = controller.update(vr[k], vm[k], lo, hi)
-        else:
-            # Eller styrning med open-loop
-            cmd = lo if v[k] <= 0.0 else hi
+        if not controller:
+            # Open-loop control
+            cmd = lo if v[k] < 0.0 else hi
 
-        # Gränserna gäller även mellan sampel
+        elif k % n_ctrl == 0:
+            # New controller sample
+            cmd = controller.update(vr[k], vm[k], lo, hi)
+
+        # Limits also apply between samples
         u_k = float(np.clip(cmd, lo, hi))
-
 
         a[k], Ia[k], Ua[k], Fd[k] = f(v[k], u_k, α[k])
 
@@ -106,7 +107,7 @@ def step_method_forever(
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
 ) -> Generator[EulerStep, StepInput, EulerSim]:
-    """Euler stegmetod som generator för oändlig realtidssimulering."""
+    """Euler step method as a generator for infinite real-time simulation."""
     t0, dt = settings.t0, settings.dt
     s_k = 0.0
     x_k, y_k, α_k, v_k, a_k = (
@@ -158,17 +159,20 @@ def step_method_forever(
 
             vm_k = sensor.measure_velocity(v_k, t_k) if sensor else v_k
 
-            # Beräkna hastighetsberoende styrgränser från Settings
+            # Calculate speed-dependent control limits from Settings
             lo, hi = settings.get_control_limits(mode, v_k)
 
             if u_manual is not None:
+                # Manual control
                 u_cmd = float(u_manual)
                 if controller:
                     controller.previous_error = 0.0
             elif controller:
+                # New controller sample
                 if k % n_ctrl == 0:
                     u_cmd = float(controller.update(vr_k, vm_k, lo, hi))
             else:
+                # Open-loop control
                 u_cmd = lo if v_k <= 0.0 else hi
 
             u_k = float(np.clip(u_cmd, lo, hi))

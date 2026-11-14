@@ -1,176 +1,171 @@
 #!/usr/bin/env python3
 
+import math
 import warnings
 import numpy as np
 
 TWO_PI = 2.0 * np.pi
-ACCURACY = 0.25
-VALID_PPR = {
-    48, 96, 100, 125, 192, 200, 250, 256,
-    384, 400, 500, 512, 800, 1000, 1024, 2048,
-}
+
+PPR_SIGMA_1 = [256, 512, 1024, 2048]
+PPR_SIGMA_2 = [48, 96, 100, 125, 192, 200, 250, 384, 400, 500]
+PPR_SIGMA_3 = [800, 1000]
+VALID_PPR = {*PPR_SIGMA_1, *PPR_SIGMA_2, *PPR_SIGMA_3}
+
+# Quadrature duty cycle tolerance (min, max offset from 50%) by resolution
 DUTY_CYCLE_TOL_BY_PPR = {
-    **{ppr: (-0.01, 0.01) for ppr in (256, 512, 1024, 2048)},
-    **{ppr: (-0.03, 0.03) for ppr in (48, 96, 100, 125, 192, 200, 250, 384, 400, 500)},
-    **{ppr: (-0.07, 0.06) for ppr in (800, 1000)},
+    **{ppr: (-0.01, 0.01) for ppr in PPR_SIGMA_1},  # 49 - 51 %
+    **{ppr: (-0.03, 0.03) for ppr in PPR_SIGMA_2},  # 47 - 53 %
+    **{ppr: (-0.07, 0.06) for ppr in PPR_SIGMA_3},  # 43 - 56 %
 }
-FLANK_EDGE_PULSE_TRIGGER_TIME = 30e-9
+
+# Resolutions limited to 7500 RPM; all other resolutions allow 15000 RPM
+PPR_MAX_7500_RPM = {192, 384, 400, 500, 800, 1000, 1024, 2048}
+FLANK_EDGE_PULSE_TRIGGER_TIME = 30e-9  # CMOS rise/fall time (s)
+
 
 class AMT102VSensor:
     def __init__(
         self,
-        PPR=2048,
-        wheel_radius=0.2,
-        gear_ratio=3.0,
+        *,
+        wheel_radius,
+        gear_ratio,
+        PPR=1024,
         sample_rate_hz=100.0,
         enable_quantization=True,
-        seed=1,
     ):
-        """Initierar AMT102-V sensormodellen.
+        """Initialize a discrete AMT102-V sensor model.
 
         Parameters
         ----------
-        PPR : int
-            Pulser per varv (Pulses Per Revolution). Standard: 2048 PPR.
         wheel_radius : float
-            Fordonets hjulradie i meter [m]. Standard: 0.2 m.
+            Vehicle wheel radius in meters.
         gear_ratio : float
-            Utväxling från motor till hjul. Standard: 3.0.
-        sample_rate_hz : float
-            Sensorns samplingfrekvens i Hz.
+            Gear ratio from motor to wheel.
+        PPR : int, default=1024
+            Pulses per revolution.
+        sample_rate_hz : float, default=100.0
+            Sensor sampling frequency in Hz.
         enable_quantization : bool, default=True
-            Simulera diskretiseringsfel (kvantiseringsfel från pulser).
-        seed :
-            Seed till rng
+            Simulate quantization.
         """
         if PPR not in VALID_PPR:
-            raise ValueError(f"Ogiltig PPR ({PPR}). Tillåtna värden {VALID_PPR}")
+            raise ValueError(
+                f"Invalid PPR ({PPR}), choose from available {VALID_PPR}"
+            )
 
-        # Hårdvaraspecifikationer och inställningar
+        # Hardware settings
         self.PPR = PPR
-        self.CPR = 4 * PPR  # PPR x 4 efter kvadraturavkodning
-        self.max_rpm = 7500.0 if PPR >= 1000 else 15000.0
-        self.max_omega_shaft = (self.max_rpm / 60.0) * TWO_PI
-        self.max_omega_shaft_range = (-self.max_omega_shaft, self.max_omega_shaft)
-        self.accuracy_rad = np.radians(ACCURACY)
+        self.CPR = 4 * PPR  # PPR x 4 after quadrature decoding
+        max_rpm = 7500.0 if PPR in PPR_MAX_7500_RPM else 15000.0
+        self.max_omega = (max_rpm / 60.0) * TWO_PI
+        self.accuracy = np.radians(0.25)
         self.duty_cycle_tol = DUTY_CYCLE_TOL_BY_PPR[PPR]
-        self.machine_precision = 1e-15
+        self.rise_fall_time = FLANK_EDGE_PULSE_TRIGGER_TIME
 
-        # Simulering
-        self.r = wheel_radius
-        self.gear_ratio = gear_ratio
+        # Simulation parameters
         self.sample_interval = 1.0 / sample_rate_hz
         self.enable_quantization = enable_quantization
-        self.seed = seed
+        self.rng = np.random.default_rng(seed=42)
 
-        # Konverteringsfaktorer
         self.omega_to_v = wheel_radius / gear_ratio
-        self.rad_to_counts = self.CPR / TWO_PI
-        self.counts_to_rad = 1.0 / self.rad_to_counts
+        self.v_to_omega = 1.0 / self.omega_to_v
+        self.counts_to_rad = TWO_PI / self.CPR
 
         self.reset()
 
-    def _build_wheel_edges(self):
-        """Beräknar fysiska flankvinklar för enheten baserat på duty cycle och vinkelnoggrannhet."""
-        pulse_period_rad = TWO_PI / self.PPR # pulse period
-        duty_cycle = 0.50 + self.duty_cycle_asymmetry
-
-        # Flankpositioner inom en elektrisk cykel (A upp, B upp, A ner, B ner)
-        base_pulse_edges = np.array([0.0,  0.25, duty_cycle, duty_cycle+0.25])
-        pulse_starts = np.repeat(np.arange(self.PPR) * pulse_period_rad, 4)
-        edge_offsets = np.tile(base_pulse_edges * pulse_period_rad, self.PPR)
-        ideal_edge_angles = pulse_starts + edge_offsets
-        edge_error_rad = self.accuracy_rad * np.sin(
-            ideal_edge_angles + self.eccentricity_phase_offset
+    def get_counts(self, omega):
+        """Integer pulse count at the current shaft angle."""
+        # Half the 30 ns rise/fall time for logic-threshold crossing plus
+        # 1.5 us hardcoded MCU interrupt/timer capture jitter.
+        capture_delay = (
+            0.5 * self.rise_fall_time + self.rng.normal(0.0, 1.5e-6)
         )
-        distorted_edge_angles = ideal_edge_angles + edge_error_rad
-        return np.sort(np.mod(distorted_edge_angles, TWO_PI))
-
-    def _compute_hardware_counts(self, omega_shaft):
-        """Beräknar heltalsvärdet i hårdvarans pulsräknare vid nuvarande axelvinkel."""
-        edge_delay = omega_shaft * FLANK_EDGE_PULSE_TRIGGER_TIME
-        delayed_shaft_angle_rad = (
-            self.theta
-            + self.initial_shaft_angle_offset
-            - edge_delay
+        sensed_angle = (
+            self.theta + self.theta0  # True shaft angle
+            - omega * capture_delay   # Threshold + capture delay
         )
-        full_revolutions = int(np.floor(delayed_shaft_angle_rad / TWO_PI))
-        revolution_angle_rad = delayed_shaft_angle_rad - full_revolutions * TWO_PI
-
-        passed_edges_in_revolution = int(
-            np.searchsorted(self.wheel_edge_angles_rad, revolution_angle_rad, side="right")
+        accuracy_error = self.accuracy_amplitude * math.sin(
+            sensed_angle + self.accuracy_phase
         )
 
-        return full_revolutions * self.CPR + passed_edges_in_revolution
+        # Convert angle to quadrature counts and apply falling-edge offsets
+        continuous_counts = (
+            (sensed_angle - accuracy_error) / self.counts_to_rad
+        )
+        pulses = math.floor(continuous_counts / 4.0)
+        state_pos = continuous_counts - 4.0 * pulses
+
+        # [A_rise, B_rise, A_fall, B_fall]
+        return (
+            4 * pulses
+            + (state_pos >= 1.0)
+            + (state_pos >= 2.0 + self.duty_offset_A)
+            + (state_pos >= 3.0 + self.duty_offset_B)
+        )
 
     def reset(self):
-        """Återställ/nollställ sensorn inför en ny simulering."""
-        self.rng = np.random.default_rng(self.seed)
+        """Reset the sensor before a new simulation."""
+        # Unknown starting position (missing Z-index)
+        self.theta0 = self.rng.uniform(0.0, TWO_PI)
 
-        self.started = False
-        self._warned_overspeed = False
+        # Once-per-revolution accuracy error.
+        # The datasheet lists the accuracy as typical, with no distribution
+        # given. Assume it is the mean amplitude of a uniform [0, 2x typical]
+        # draw. The phase is unknown relative to the disc.
+        self.accuracy_amplitude = self.rng.uniform(0.0, 2.0 * self.accuracy)
+        self.accuracy_phase = self.rng.uniform(0.0, TWO_PI)
 
-        self.t_next = 0.0
+        # Tolerance deviation in the quadrature duty cycle (%)
+        # Randomized within the limits for the selected PPR
+        self.duty_offset_A = 4.0 * self.rng.uniform(*self.duty_cycle_tol)
+        self.duty_offset_B = 4.0 * self.rng.uniform(*self.duty_cycle_tol)
+
+        self.t_prev = None
         self.t_sample_prev = 0.0
-        self.t_prev = 0.0
+        self.t_next = 0.0
         self.theta = 0.0
-        self.prev_total_counts = 0
+        self.prev_counts = 0
+        self.omega_prev = 0.0
         self.last_measured_v = 0.0
 
-        # Slumpas automatiskt inom databladets gränser för vald PPR
-        self.initial_shaft_angle_offset = self.rng.uniform(0.0, TWO_PI)
-        self.eccentricity_phase_offset = self.rng.uniform(0.0, TWO_PI)
-        self.duty_cycle_asymmetry = self.rng.uniform(*self.duty_cycle_tol)
-
-        self.wheel_edge_angles_rad = self._build_wheel_edges()
-
-    def first_measure(self, t):
-        self.t_prev = t
-        self.t_sample_prev = t
-        self.t_next = t + self.sample_interval
-        self.prev_total_counts = self._compute_hardware_counts(omega_shaft=0.0)
-        self.started = True
-        return 0.0
-
     def measure_velocity(self, v_true, t) -> float:
-        omega_wheel = v_true / self.r
-        omega_shaft_demand = omega_wheel * self.gear_ratio
+        if not self.enable_quantization:
+            return v_true
 
-        if abs(omega_shaft_demand) > self.max_omega_shaft and not self._warned_overspeed:
-            warnings.warn("AMT102-V användes över max RPM: utsignal utanför specs")
-            self._warned_overspeed = True
+        if abs(omega := v_true * self.v_to_omega) > self.max_omega:
+            warnings.warn("AMT102-V exceeded max RPM")
 
-        omega_shaft = np.clip(omega_shaft_demand, *self.max_omega_shaft_range)
+        if self.t_prev is None:
+            self.t_prev = t
+            self.t_sample_prev = t
+            self.t_next = t + self.sample_interval
+            self.prev_counts = self.get_counts(omega)
+            self.omega_prev = omega
+            return 0.0
 
-        if not self.started:
-            return self.first_measure(t)
-
-        # Integrera motoraxelns vinkel
-        dt = t - self.t_prev
+        if (dt := t - self.t_prev) < 0.0:
+            raise ValueError("Reset sensor before new simulation")
         self.t_prev = t
-        if dt > 0.0:
-            self.theta += omega_shaft * dt
 
-        # Vänta tills nästa samplingsögonblick
+        # Integrate shaft angle as trapezoid
+        self.theta += 0.5 * (self.omega_prev + omega) * dt
+        self.omega_prev = omega
+
+        # Wait for next sample
         if t < self.t_next:
             return self.last_measured_v
 
         dt_sample = t - self.t_sample_prev
         self.t_sample_prev = t
+
+        # Skip missed samples if step is longer than interval
         while self.t_next <= t:
             self.t_next += self.sample_interval
 
-        # Uppmätt värde om kvantisering är avstängd
-        v_measured = omega_shaft * self.omega_to_v
+        counts = self.get_counts(omega)
+        count_diff = counts - self.prev_counts
+        self.prev_counts = counts
 
-        if self.enable_quantization:
-            quantized_total_counts = self._compute_hardware_counts(omega_shaft)
-
-            sampled_count_diff = quantized_total_counts - self.prev_total_counts
-            self.prev_total_counts = quantized_total_counts
-
-            omega_measured = (sampled_count_diff * self.counts_to_rad) / dt_sample
-            v_measured = omega_measured * self.omega_to_v
-
-        self.last_measured_v = float(v_measured)
+        omega_measured = (count_diff * self.counts_to_rad) / dt_sample
+        self.last_measured_v = omega_measured * self.omega_to_v
         return self.last_measured_v

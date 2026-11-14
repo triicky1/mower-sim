@@ -14,7 +14,7 @@ from .euler import step_method, step_method_forever
 from .road import RoadProfile
 from .sensor import AMT102VSensor
 from .types import EulerSim, EulerStep, LiveCommand, RoadSegment
-from .write import print_welcome
+from .write import print_welcome, summarize
 
 __all__ = [
     "ControlMode",
@@ -29,6 +29,7 @@ __all__ = [
     "VehicleDynamics",
     "step_method",
     "step_method_forever",
+    "summarize",
     "EulerSim",
     "EulerStep",
     "LiveCommand",

@@ -6,7 +6,7 @@ import numpy as np
 
 
 class EulerSim(NamedTuple):
-    """Simuleringsresultat för vanlig simulering"""
+    """Simulation result for standard simulation"""
     t: np.ndarray
     s: np.ndarray
     x: np.ndarray
@@ -26,7 +26,7 @@ class EulerSim(NamedTuple):
 
 
 class EulerStep(NamedTuple):
-    """Simuleringsresultat för live simulering"""
+    """Simulation result for live simulation"""
     t: float
     s: float
     x: float
@@ -46,7 +46,7 @@ class EulerStep(NamedTuple):
 
 
 class LiveCommand(NamedTuple):
-    """Styrkommando som skickas in till step_method_forever vid live-körning."""
+    """Control command sent to step_method_forever during live execution."""
     vr: float | None = None
     u_manual: float | None = None
     α: float | None = None

@@ -2,44 +2,39 @@
 
 import numpy as np
 
-# https://www.digikey.com/en/maker/tutorials/2024/implementing-a-pid-controller-algorithm-in-python
 class Controller:
     def __init__(self, Kp=0.0, Ki=0.0, Kd=0.0, Ts=0.0, enable_history=False):
-        """Initierar en tidsdiskret PID-regulator
+        """Initializes a discrete-time PID controller
 
         Parameters
         ----------
         Kp : float, default=0.0
-            Proportionalförstärkning.
+            Proportional gain.
         Ki : float, default=0.0
-            Integralförstärkning.
+            Integral gain.
         Kd : float, default=0.0
-            Derivataförstärkning.
+            Derivative gain.
         dt : float, default=0.0
-            Tidssteg i sekunder.
+            Time step in seconds.
         enable_history : bool, default=False
-            Spara historik av alla börvärden, insignaler och styrsignaler.
+            Save history of all setpoints, input signals, and control signals.
         """
         self.Kp, self.Ki, self.Kd, self.Ts = Kp, Ki, Kd, Ts
-
         self.want_log = enable_history
-
         self.reset()
 
 
-    # TODO: Lägg till beskrivning för anti-windup
-    # Slutar integreringen vid små förändringar ...
     def update(self, setpoint, measurement, lo, hi):
-        """Beräkna nästa styrsignal.
+        """Calculate the next control signal.
 
         Parameters
         ----------
         setpoint : float
-            Processens börvärde.
+            Process setpoint.
         measurerment : float
-            Processens mätvärde.
+            Process measurement.
         lo, hi : float
-            Utsignalens undre/övre begräsning.
+            Lower/upper limits of the output signal.
         """
         error = setpoint - measurement
         integral = self.integral + error * self.Ts
@@ -49,19 +44,19 @@ class Controller:
         u_command = np.clip(u_demand, lo, hi)
         self.previous_error = error
 
-        # Mättnadsskydd (villkorlig integrering)
+        # Anti-windup
         if error * (u_demand - u_command) <= 0:
             self.integral = integral
 
-        # Uppdatera historik
+        # Update history
         if self.want_log:
             self._update_history(setpoint,measurement,u_command)
 
-        return np.clip(u_command, lo, hi)
+        return u_command
 
 
     def reset(self):
-        """Nollställer/initierar regulatorinställningar."""
+        """Resets/initializes controller settings."""
         self.previous_error = 0.0
         self.integral = 0.0
         if self.want_log:
@@ -72,7 +67,7 @@ class Controller:
 
 
     def _update_history(self, r, y, u):
-        """Uppdaterar historik."""
+        """Updates history."""
         if self.want_log:
             t = self.timestamps[-1] + self.Ts if self.timestamps else 0
             self.timestamps.append(t)
