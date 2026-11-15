@@ -40,17 +40,26 @@ def plot_transients(res: EulerSim, *, params: Params = Params(), title: str = ""
         fig, axes = plt.subplots(2, 2, sharex="col", figsize=(11, 7.0), constrained_layout=True)
         ax_v, ax_fa, ax_u, ax_i = axes.ravel()
 
-        # 1. Velocity (actual and reference)
+        # Velocity (actual and reference) & Horizontal position (twin axis)
         ax_v.plot(t, res.vr, "k--", lw=1.1, zorder=2, label=r"Reference $v_\mathrm{ref} (v_\mathrm{work})$")
+
+        ax_x = ax_v.twinx()
+        ax_x.grid(False)
+        ax_x.spines["top"].set_visible(False)
+
         plk.draw(
             ax_v, t, res.v, color=COL["v"], lw=1.8, zorder=3,
             label=r"Actual $v$", ylabel="Velocity (m/s)",
-            title="Velocity response", vlines=t_trans, ref=trans_style,
-            legend=dict(loc="lower right", ncol=2),
+            title="Velocity & Position", vlines=t_trans, ref=trans_style,
+            legend=False,
         )
+        ax_x.plot(t, res.x, color=COL["x"], lw=1.2, ls="-.", zorder=3, label=r"Position $x$")
+        ax_x.set_ylabel("Horizontal position $x$ (m)", color=COL["x"])
+        ax_x.tick_params(axis="y", labelcolor=COL["x"])
         _shade_slopes(ax_v, res)
+        plk.merged_legend(ax_v, ax_x, loc="lower right", ncol=3)
 
-        # 2. Driving force Fd & Acceleration a (twin axis)
+        # Driving force Fd & Acceleration a (twin axis)
         ax_f = ax_fa.twinx()
         ax_f.grid(False)
         ax_f.spines["top"].set_visible(False)
@@ -68,18 +77,17 @@ def plot_transients(res: EulerSim, *, params: Params = Params(), title: str = ""
         plk.merged_legend(ax_fa, ax_f, loc="upper right", ncol=3)
         _shade_slopes(ax_fa, res)
 
-        # 3. Armature voltage Ua with limits
+        # Armature voltage Ua with limits
         plk.draw(
             ax_u, t, res.Ua, color=COL["u"], lw=1.3,
             xlabel="Time $t$ (s)", ylabel="Armature voltage $u_a$ (V)",
             title="Motor voltage",
             hlines={U_nom: r"$\pm U_\mathrm{nom}$", -U_nom: None}, ref=LIMIT,
-            # vlines=t_trans, legend=dict(loc="upper left"),
             vlines=t_trans, legend=dict(bbox_to_anchor=(1,0.95)),
         )
         _shade_slopes(ax_u, res)
 
-        # 4. Armature current Ia with limits
+        # Armature current Ia with limits
         plk.draw(
             ax_i, t, res.Ia, color=COL["i"], lw=1.2,
             xlabel="Time $t$ (s)", ylabel="Armature current $i_a$ (A)",
