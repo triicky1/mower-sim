@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # hmi/live.py
 
 from collections import deque
@@ -106,7 +105,7 @@ def _draw_world(
     origin_x = rect.left + int(rect.width * 0.30)
     origin_y = rect.top + int(rect.height * 0.62)
 
-    # Rörligt bakgrundsrutnät i världskoordinater (var 5:e meter)
+    # Moving background grid in world coordinates (every 5 meters)
     grid_step_px = int(5.0 * px_per_m)
     x_offset = int((-step.x * px_per_m) % grid_step_px)
     y_offset = int((step.y * px_per_m) % grid_step_px)
@@ -138,7 +137,7 @@ def _draw_world(
         pygame.draw.polygon(surface, (39, 46, 51), poly_pts)
         pygame.draw.lines(surface, ACCENT_GREEN, False, road_pts, 3)
 
-    # Slipers/vägmarkeringar var 2:a meter och text var 10:e meter
+    # Sleepers/road markers every 2 meters and text every 10 meters
     first_tick = int(math.floor(s_left / 2.0) * 2)
     last_tick = int(math.ceil(s_right / 2.0) * 2)
     for s_tick in range(first_tick, last_tick + 1, 2):
@@ -153,7 +152,7 @@ def _draw_world(
             else:
                 pygame.draw.line(surface, (85, 95, 90), (mx, my), (mx, my + 6), 2)
 
-    # Rita fordonet lutat med vinkeln α
+    # Draw the vehicle tilted at angle α
     ca = math.cos(step.α)
     sa = math.sin(step.α)
     r_px = max(8, int(settings.r * px_per_m * 1.4))
@@ -199,10 +198,10 @@ def run_live(
     settings: Settings,
     window_size: tuple[int, int] = (1200, 760),
 ) -> EulerSim:
-    """Kör interaktiv realtidssimulering i Pygame och returnerar EulerSim."""
+    """Runs interactive real-time simulation in Pygame and returns EulerSim."""
     pygame.init()
     screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
-    pygame.display.set_caption(f"Fordonssimulator Live ({mode})")
+    pygame.display.set_caption(f"Vehicle Simulator Live ({mode})")
     clock = pygame.time.Clock()
 
     font = pygame.font.SysFont("monospace", 14)
@@ -329,28 +328,28 @@ def run_live(
         )
 
         ctrl_state = (
-            "OPEN-LOOP (Manuell)"
+            "OPEN-LOOP (Manual)"
             if open_loop
-            else ("PID (Manuell v_ref)" if vr_manual is not None else "PID (Auto ramp/road)")
+            else ("PID (Manual v_ref)" if vr_manual is not None else "PID (Auto ramp/road)")
         )
-        slope_state = "Manuell" if alpha_manual is not None else "RoadProfile"
+        slope_state = "Manual" if alpha_manual is not None else "RoadProfile"
         status_line = (
             f"t={step.t:6.2f}s ({time_scale:.2g}x) | "
             f"s={step.s:6.1f}m | "
             f"v={step.v:+5.2f} m/s (v_ref={step.vr:+5.2f}, v_m={step.vm:+5.2f}) | "
             f"α={math.degrees(step.α):+5.1f}° ({slope_state}) | "
             f"Ia={step.Ia:+6.1f}A | Ua={step.Ua:+6.1f}V | "
-            f"Läge: {ctrl_state}"
+            f"Mode: {ctrl_state}"
         )
         help_line = (
-            "[W/S el. UPP/NED]: Styr v_ref / pådrag  "
-            "[A/D el. VÄN/HÖG]: Lutning α  "
-            "[SPACE]: Broms (0)  "
+            "[W/S or UP/DOWN]: Control v_ref / input  "
+            "[A/D or LEFT/RIGHT]: Slope α  "
+            "[SPACE]: Brake (0)  "
             "[M]: PID/Open-Loop  "
             "[R]: Auto  "
-            "[P]: Paus  "
-            "[1-4]: Tidsskala  "
-            "[Q/ESC]: Avsluta & Spara"
+            "[P]: Pause  "
+            "[1-4]: Time scale  "
+            "[Q/ESC]: Quit & Save"
         )
         screen.blit(font_bold.render(status_line, True, TEXT_COLOR), (20, world_rect.bottom + 10))
         screen.blit(font.render(help_line, True, MUTED_TEXT), (20, world_rect.bottom + 32))
@@ -373,7 +372,7 @@ def run_live(
             [(vm_buf, MUTED_TEXT, 1), (vr_buf, ACCENT_ORANGE, 2), (v_buf, ACCENT_GREEN, 2)],
             -0.5 * v_span,
             v_span,
-            "Hastighet v (grön), v_ref (orange), v_m (grå)",
+            "Velocity v (green), v_ref (orange), v_m (gray)",
             "m/s",
             font,
         )
@@ -396,7 +395,7 @@ def run_live(
             [(i_buf, ACCENT_PURPLE, 2)],
             settings.I_min * 1.15,
             settings.I_max * 1.15,
-            "Ankarström Ia",
+            "Armature current Ia",
             "A",
             font,
             limit_lines=[settings.I_min, settings.I_max],
@@ -408,7 +407,7 @@ def run_live(
             [(u_buf, ACCENT_BLUE, 2)],
             -settings.U_nom * 1.15,
             settings.U_nom * 1.15,
-            "Ankarspänning Ua",
+            "Armature voltage Ua",
             "V",
             font,
             limit_lines=[-settings.U_nom, settings.U_nom],
@@ -422,4 +421,4 @@ def run_live(
     except StopIteration as e:
         return e.value
 
-    raise RuntimeError("Generatorn returnerade inget EulerSim-objekt.")
+    raise RuntimeError("The generator did not return an EulerSim object.")
