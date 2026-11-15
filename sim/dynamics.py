@@ -10,51 +10,51 @@ class VehicleDynamics:
         self.params = params or Params()
 
     def _vehicle_acceleration(self, v: float, α: float, Fd: float) -> float:
-        r"""Beräknar fordonets acceleration längs färdriktningen.
+        r"""Calculates the vehicle's acceleration along the direction of travel.
 
-        Newtons andra lag bestämmer totalkraften som summan av alla krafter
-        längs rörelseriktningen, `F = Fd - F_roll - F_drag - F_grav = ma`, där
-        motståndskrafterna `F_roll` och  `F_drag` verkar mot rörelseriktningen.
+        Newton's second law determines the total force as the sum of all forces
+        along the direction of motion, `F = Fd - F_roll - F_drag - F_grav = ma`, where
+        the resistive forces `F_roll` and  `F_drag` act against the direction of motion.
         """
         veh = self.params
 
-        A = veh.Af if v >= 0 else veh.Ab             # Tvärsnittsarea
-        F_drag = 0.5 * veh.Cd * veh.ρ * A * v**2     # Luftmotstånd
-        F_roll = veh.Cr * veh.m * veh.g* np.cos(α) # Rullmotstånd
-        F_grav = veh.m * veh.g * np.sin(α)           # Tyngdkraft
-        Ff = veh.μ * veh.m * veh.g * np.cos(α)     # Friktionskraft
+        A = veh.Af if v >= 0 else veh.Ab             # Cross-sectional area
+        F_drag = 0.5 * veh.Cd * veh.ρ * A * v**2     # Aerodynamic drag
+        F_roll = veh.Cr * veh.m * veh.g* np.cos(α) # Rolling resistance
+        F_grav = veh.m * veh.g * np.sin(α)           # Gravitational force
+        Ff = veh.μ * veh.m * veh.g * np.cos(α)     # Friction force
 
-        # Statisk friktion.
+        # Static friction.
         if abs(v) < veh.ϵ and abs(Fd - F_grav) <= F_roll:
             return 0.0
 
-        # Motståndskrafter verkar mot fordonets rörelseriktning
+        # Resistive forces act against the vehicle's direction of motion
         sgn = np.sign(v) or np.sign(Fd - F_grav)
         return 1/veh.m * (Fd - (F_roll + F_drag) * sgn - F_grav)
 
 
     def dynamics_current(self, v: float, i: float, α: float = 0.0):
-        """Fordonsvehl med ankarström som insignal (strömstyrning).
+        """Vehicle model with armature current as input (current control).
 
-        Motorn matas med ström `Ia`. vehlen beräknar ankarspänningen
-        `Ua = Ra · Ia + Kt · ω` (där `ω = i2or · v / r`), motorns drivkraft
-        `Fd = (i2or · η / r) · (Kt · Ia - Tf · sgn(ω))` och accelerationen
+        The motor is supplied with current `Ia`. The model calculates the armature voltage
+        `Ua = Ra · Ia + Kt · ω` (where `ω = i2or · v / r`), the motor's driving force
+        `Fd = (i2or · η / r) · (Kt · Ia - Tf · sgn(ω))` and the acceleration
         `dv/dt = f(v, α, Fd)` via `_vehicle_acceleration`.
 
         Note
         ----
-        Spänningen är här en utsignal som regulatorn måste hålla inom |U_nom|.
+        Here, the voltage is an output that the controller must keep within |U_nom|.
         """
         veh = self.params
 
-        ω = veh.i2or * v / veh.r      # Motorns vinkelfrekvens
-        Ua = veh.Ra * i + veh.Kt * ω  # Ankarspänningen §$U_a(v)$§
+        ω = veh.i2or * v / veh.r      # Motor angular velocity
+        Ua = veh.Ra * i + veh.Kt * ω  # Armature voltage §$U_a(v)$§
 
-        # Motorns inre friktionskrafter verkar mot vinkelfrekvensen.
-        # Om varvtalet är noll motverkar friktionen det drivande momentet.
+        # The motor's internal friction forces act against the angular velocity.
+        # If the rotational speed is zero, friction opposes the driving torque.
         sgn = np.sign(ω) or np.sign(veh.Kt*i)
 
-        # Motorns effektiva drivkraft.
+        # The motor's effective driving force.
         Fd = (veh.i2or * veh.η / veh.r) * (veh.Kt * i - veh.Tf * sgn)
         a = self._vehicle_acceleration(v, α, Fd)
 
@@ -62,24 +62,24 @@ class VehicleDynamics:
 
 
     def dynamics_voltage(self, v: float, u: float, α: float = 0.0):
-        """Fordonsvehl med ankarspänning som insignal (spänningsstyrning).
+        """Vehicle model with armature voltage as input (voltage control).
 
-        Motorn matas med spänning `Ua`. vehlen beräknar ankarströmmen
-        `Ia = (Ua - Kt · ω) / Ra` (där `ω = i2or · v / r`), motorns drivkraft
-        `Fd = (i2or · η / r) · (Kt · Ia - Tf · sgn(ω))` och accelerationen
+        The motor is supplied with voltage `Ua`. The model calculates the armature current
+        `Ia = (Ua - Kt · ω) / Ra` (where `ω = i2or · v / r`), the motor's driving force
+        `Fd = (i2or · η / r) · (Kt · Ia - Tf · sgn(ω))` and the acceleration
         `dv/dt = f(v, α, Fd)` via `_vehicle_acceleration`.
-        Strömmen är här en utsignal som regulatorn måste hålla inom ±I_max.
+        Here, the current is an output that the controller must keep within ±I_max.
         """
         veh = self.params
 
-        ω = veh.i2or * v / veh.r                    # Motorns vinkelfrekvens
-        Ia = (u - veh.Kt * ω) / veh.Ra              # Ankarspänningen §$U_a(v)$§
+        ω = veh.i2or * v / veh.r                    # Motor angular velocity
+        Ia = (u - veh.Kt * ω) / veh.Ra              # Armature voltage §$U_a(v)$§
 
-        # Motorns inre friktionskrafter verkar mot vinkelfrekvensen.
-        # Om varvtalet är noll motverkar friktionen det drivande momentet.
+        # The motor's internal friction forces act against the angular velocity.
+        # If the rotational speed is zero, friction opposes the driving torque.
         sgn = np.sign(ω) or np.sign(veh.Kt*Ia)
 
-        # Motorns effektiva drivkraft.
+        # The motor's effective driving force.
         Fd = (veh.i2or * veh.η / veh.r) * (veh.Kt * Ia - veh.Tf * sgn)
         a = self._vehicle_acceleration(v, α, Fd)
 
@@ -87,10 +87,10 @@ class VehicleDynamics:
 
 
     def ramp_ref(self, t: float, vref: float | None = None) -> float:
-        """Linjär börvärdesramp uppåt.
+        """Linear upward setpoint ramp.
 
-        Börvärdet ökar linjärt från 0 med lutningen a_max, räknat från
-        starttiden t0, och begränsas uppåt av arbetshastigheten v_work.
+        The setpoint increases linearly from 0 with slope a_max, starting from
+        the start time t0, and is upper-bounded by the working speed v_work.
         """
         veh = self.params
         vref = vref or veh.v_work
@@ -102,10 +102,10 @@ class VehicleDynamics:
 
 
     def deramp_ref(self, t: float, vref: float | None = None) -> float:
-        """Linjär börvärdesramp nedåt.
+        """Linear downward setpoint ramp.
 
-        Börvärdet minskar linjärt med lutningen a_max, räknat från t0,
-        och begränsas nedåt av 0 så att det aldrig blir negativt.
+        The setpoint decreases linearly with slope a_max, starting from t0,
+        and is lower-bounded by 0 so that it never becomes negative.
         """
         veh = self.params
         vref = veh.v_work if vref is None else vref
