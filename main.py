@@ -103,20 +103,22 @@ def main():
     )
 
     # Visualize the impact from the sensor (ideal sensor vs AMT102-V with quantization)
-    cfg_ideal = Settings(tf=45.0, dt=0.001, Kp=100, Ki=300)
-    dyn_ideal = VehicleDynamics(cfg_ideal)
-    sim_ideal = step_method(ROAD, dyn_ideal.dynamics_current, "current", cfg_ideal, sensor=False)
-    summarize(sim_ideal, "Ideal sensor with current control", cfg_ideal)
+    cfg_compare = Settings(tf=45.0, dt=0.001, Kp=100, Ki=300)
+    dyn_compare = VehicleDynamics(cfg_compare)
+
+    # no breaking in the end to get accurate simulations
+    sim_compare = step_method(ROAD, dyn_compare.dynamics_current, "current", cfg_compare, sensor=True, silent=True)
+    sim_ideal = step_method(ROAD, dyn_compare.dynamics_current, "current", cfg_compare, sensor=False)
+    summarize(sim_ideal, "Ideal sensor with current control", cfg_compare)
 
     plot_sensor_effect(
         sim_ideal,
-        sim_current,
-        params=cfg_ideal,
+        sim_compare,
+        params=cfg_compare,
         save_path="sensor_effect",
     )
 
-    plot_sensor_fft(sim_ideal, sim_current, params=cfg_current, sensor_fs=100.0,
-                save_path="sensor_fft.pdf")
+    plot_sensor_fft(sim_ideal, sim_compare, params=cfg_compare, sensor_fs=100.0, save_path="sensor_fft.pdf")
 
 
 def live():
@@ -146,12 +148,13 @@ def live():
         save_path="livecontrol",
     )
 
-    plt.show()
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ['live']:
-        live()
-    else:
-        main()
-        if 'plots' in sys.argv[1:]:
-            plt.show()
+    try:
+        live() if 'live' in sys.argv[1:] else main()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        exit(0)
+
+    if 'plots' in sys.argv[1:]:
+        plt.show()
