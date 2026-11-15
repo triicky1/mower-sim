@@ -24,7 +24,7 @@ def mkdir(d: str, p=PWD):
     (p/d).mkdir(parents=True, exist_ok=True)
 
 
-def savefig(title:str | None = None, dpi=600, WD=PWD, format='.pdf'):
+def savefig(title:str | None = None, ax=None, dpi=600, WD=PWD, format='.pdf'):
     if title:
         if not title.endswith(format): title += format
         _ = 'figures', 'resources', 'images', ''
@@ -120,7 +120,7 @@ BASE_RC = {
     "font.serif": ["STIXGeneral"],
     "mathtext.fontset": "stix",
     "axes.titlesize": 15,
-    "axes.labelsize": 11,
+    "axes.labelsize": 10,
     "xtick.labelsize": 10,
     "ytick.labelsize": 10,
     "legend.fontsize": 10,
@@ -183,8 +183,8 @@ TEMPLATES = {
 
     # Compact multi-panel style (subplots sharing axes or tight grid arrays)
     "compact": {
-        "axes.titlesize": 11,
-        "axes.labelsize": 10,
+        "axes.titlesize": 14,
+        "axes.labelsize": 12,
         "xtick.labelsize": 9,
         "ytick.labelsize": 9,
         "legend.fontsize": 9,
