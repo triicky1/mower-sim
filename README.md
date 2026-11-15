@@ -10,6 +10,12 @@ cd mower-sim
 pip install -r requirements.txt
 ```
 
+## Verify that everything works
+
+```bash
+pytest
+```
+
 ## Running the Simulations
 
 ```bash
