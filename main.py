@@ -31,20 +31,42 @@ ROAD = RoadProfile(
 )
 
 def main():
-    cfg_open_loop = Settings(tf=0.5, dt=0.001, u_frac=0.5, open_loop=True)
-    dyn_open_loop = VehicleDynamics(cfg_open_loop)
-    sim_open_loop = step_method(
-        ROAD, dyn_open_loop.dynamics_voltage, "voltage", cfg_open_loop,
-        controller=False, sensor=False
+    cfg_open_loop_voltage = Settings(tf=0.5, dt=0.001, u_frac=0.5, open_loop=True)
+    dyn_open_loop_voltage = VehicleDynamics(cfg_open_loop_voltage)
+    sim_open_loop_voltage = step_method(
+        RoadProfile((10,0)), # short road at 10 m for complete step response saturation without limits
+        dyn_open_loop_voltage.dynamics_voltage,
+        "voltage",
+        cfg_open_loop_voltage,
+        controller=False,
+        sensor=False
     )
-    summarize(sim_open_loop, "Open-loop")
+    summarize(sim_open_loop_voltage, "Open-loop")
+
+    cfg_open_loop_current = Settings(tf=100, dt=0.001, i_frac=0.5, open_loop=True)
+    dyn_open_loop_current = VehicleDynamics(cfg_open_loop_current)
+    sim_open_loop_current = step_method(
+        RoadProfile((5000,0)), # long straight road at 5 km for complete step response saturation without limits
+        dyn_open_loop_current.dynamics_current,
+        "current",
+        cfg_open_loop_current,
+        controller=False,
+        sensor=False
+    )
+    summarize(sim_open_loop_current, "Open-loop")
 
     # Plot the transients for task 5.
     plot_transients(
-        sim_open_loop,
-        params=cfg_open_loop,
-        title=r"Vehicle simulation: Open-loop with $\frac{1}{2} U_\text{nom}$",
-        save_path="dashboard_open_loop",
+        sim_open_loop_voltage,
+        params=cfg_open_loop_voltage,
+        title=r"Open-loop voltage step ($u_a = 0.5\,U_{\mathrm{nom}}$)",
+        save_path="dashboard_open_loop_5a",
+    )
+    plot_transients(
+        sim_open_loop_current,
+        params=cfg_open_loop_current,
+        title=r"Open-loop current step ($I_a = 0.5\,I_{\mathrm{max}}$)",
+        save_path="dashboard_open_loop_5b",
     )
 
     cfg_current = Settings(tf=45.0, dt=0.001, Kp=100, Ki=300)

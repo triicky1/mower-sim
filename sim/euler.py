@@ -49,6 +49,7 @@ def step_method(
     if isinstance(sensor, AMT102VSensor):
         sensor.reset()
     else:
+        # sensor is always enabled, simulations where its set to false turns of quantization.
         sensor = AMT102VSensor(wheel_radius=r, gear_ratio=i2or, enable_quantization=sensor)
 
     # Initialize empty vectors to store the steps in
@@ -67,7 +68,7 @@ def step_method(
         vr[k] = ramp_ref(t[k]) if not manual else vref
 
         # The sensor is read "continuously" (every step) unless set to False
-        vm[k] = sensor.measure_velocity(v[k], t[k]) if sensor else v[k]
+        vm[k] = sensor.measure_velocity(v[k], t[k])
 
         lo, hi = settings.get_control_limits(mode, v[k])
 

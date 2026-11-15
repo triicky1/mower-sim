@@ -41,7 +41,7 @@ def plot_transients(res: EulerSim, *, params: Params = Params(), title: str = ""
         ax_v, ax_fa, ax_u, ax_i = axes.ravel()
 
         # 1. Velocity (actual and reference)
-        ax_v.plot(t, res.vr, "k--", lw=1.1, zorder=2, label=r"Reference $v_\mathrm{ref}$")
+        ax_v.plot(t, res.vr, "k--", lw=1.1, zorder=2, label=r"Reference $v_\mathrm{ref} (v_\mathrm{work})$")
         plk.draw(
             ax_v, t, res.v, color=COL["v"], lw=1.8, zorder=3,
             label=r"Actual $v$", ylabel="Velocity (m/s)",
@@ -65,7 +65,7 @@ def plot_transients(res: EulerSim, *, params: Params = Params(), title: str = ""
         ax_f.plot(t, res.Fd, color=COL["f"], lw=1.1, ls="-.", label=r"Driving force $F_d$")
         ax_f.set_ylabel("Driving force $F_d$ (N)", color=COL["f"])
         ax_f.tick_params(axis="y", labelcolor=COL["f"])
-        plk.merged_legend(ax_fa, ax_f, loc="upper right", ncol=2)
+        plk.merged_legend(ax_fa, ax_f, loc="upper right", ncol=3)
         _shade_slopes(ax_fa, res)
 
         # 3. Armature voltage Ua with limits
@@ -74,7 +74,8 @@ def plot_transients(res: EulerSim, *, params: Params = Params(), title: str = ""
             xlabel="Time $t$ (s)", ylabel="Armature voltage $u_a$ (V)",
             title="Motor voltage",
             hlines={U_nom: r"$\pm U_\mathrm{nom}$", -U_nom: None}, ref=LIMIT,
-            vlines=t_trans, legend=dict(loc="upper right"),
+            # vlines=t_trans, legend=dict(loc="upper left"),
+            vlines=t_trans, legend=dict(bbox_to_anchor=(1,0.95)),
         )
         _shade_slopes(ax_u, res)
 
@@ -84,7 +85,7 @@ def plot_transients(res: EulerSim, *, params: Params = Params(), title: str = ""
             xlabel="Time $t$ (s)", ylabel="Armature current $i_a$ (A)",
             title="Motor current",
             hlines={I_max: r"$\pm I_\mathrm{max}$", -I_max: None}, ref=LIMIT,
-            vlines=t_trans, legend=dict(loc="upper right"),
+            vlines=t_trans, legend=dict(bbox_to_anchor=(1,0.95)),
         )
         _shade_slopes(ax_i, res)
 

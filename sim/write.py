@@ -62,7 +62,7 @@ def print_welcome(settings, controller=None, sensor=None, art=None, color=True):
         lines.append(r(f"Kp = {settings.Kp:g}   Ki = {settings.Ki:g}   Kd = {settings.Kd:g}   n_ctrl = {settings.n_ctrl}", "97"))
     else:
         lines.append(r("Control: open-loop", "97"))
-    if sensor is not None and hasattr(sensor, "PPR"):
+    if sensor is not None and hasattr(sensor, "PPR") and sensor.enable_quantization is not False:
         lines.append(r(f"Encoder: {sensor.PPR} PPR  ({sensor.CPR} counts/rev)", "97"))
     lines += [
         r(rule, "90"),

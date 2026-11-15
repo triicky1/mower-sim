@@ -29,7 +29,7 @@ class AMT102VSensor:
         *,
         wheel_radius,
         gear_ratio,
-        PPR=1024,
+        PPR=2048,
         sample_rate_hz=100.0,
         enable_quantization=True,
     ):

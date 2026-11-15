@@ -115,7 +115,7 @@ class Settings(Params):
             return -u_max, u_max
 
         if self.open_loop and mode == "current":
-            return -u_max, u_max
+            return i_min, i_max
 
 
         match mode:
