@@ -183,7 +183,7 @@ TEMPLATES = {
 
     # Compact multi-panel style (subplots sharing axes or tight grid arrays)
     "compact": {
-        "axes.titlesize": 14,
+        "axes.titlesize": 16,
         "axes.labelsize": 12,
         "xtick.labelsize": 9,
         "ytick.labelsize": 9,
