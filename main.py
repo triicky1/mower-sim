@@ -71,12 +71,12 @@ def main():
 
     cfg_current = Settings(tf=45.0, dt=0.001, Kp=100, Ki=300)
     dyn_current = VehicleDynamics(cfg_current)
-    sim_current = step_method(ROAD, dyn_current.dynamics_current, "current", cfg_current)
+    sim_current = step_method(ROAD, dyn_current.dynamics_current, "current", cfg_current, stop_at_end=True)
     summarize(sim_current, "Current control", cfg_current)
 
     cfg_voltage = Settings(tf=45.0, dt=0.001, Kp=5.6, Ki=116)
     dyn_voltage = VehicleDynamics(cfg_voltage)
-    sim_voltage = step_method(ROAD, dyn_voltage.dynamics_voltage, "voltage", cfg_voltage)
+    sim_voltage = step_method(ROAD, dyn_voltage.dynamics_voltage, "voltage", cfg_voltage, stop_at_end=True)
     summarize(sim_voltage, "Voltage control", cfg_voltage)
 
 
