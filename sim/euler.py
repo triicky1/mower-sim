@@ -64,12 +64,7 @@ def step_method(
     for k in range(N + 1):
         α[k] = road.slope(s[k])
 
-        # TODO: Change back to default after testing
-        t_break = tf * 0.9
-        if t[k] > t_break:
-            vr[k] = max(vref - settings.a_max * (t[k]-t_break), 0)
-        else:
-            vr[k] = ramp_ref(t[k]) if not manual else vref # default
+        vr[k] = ramp_ref(t[k]) if not manual else vref
 
         # The sensor is read "continuously" (every step) unless set to False
         vm[k] = sensor.measure_velocity(v[k], t[k]) if sensor else v[k]
