@@ -65,7 +65,7 @@ def main():
     plot_transients(
         sim_open_loop_current,
         params=cfg_open_loop_current,
-        title=r"Open-loop current step ($I_a = 0.5\,I_{\mathrm{max}}$)",
+        title=r"Open-loop current step ($i_a = 0.5\,I_{\mathrm{max}}$)",
         save_path="dashboard_open_loop_5b",
     )
 
