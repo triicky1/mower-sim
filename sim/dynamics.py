@@ -20,9 +20,10 @@ class VehicleDynamics:
 
         A = veh.Af if v >= 0 else veh.Ab             # Cross-sectional area
         F_drag = 0.5 * veh.Cd * veh.ρ * A * v**2     # Aerodynamic drag
-        F_roll = veh.Cr * veh.m * veh.g* np.cos(α) # Rolling resistance
+        F_roll = veh.Cr * veh.m * veh.g* np.cos(α)   # Rolling resistance
         F_grav = veh.m * veh.g * np.sin(α)           # Gravitational force
-        Ff = veh.μ * veh.m * veh.g * np.cos(α)     # Friction force
+        Ff = veh.μ * veh.m * veh.g * np.cos(α)       # Friction force
+        # m_eff = veh.m + veh.η * veh.Jm * (veh.i2or / veh.r)**2  # Effective mass
 
         # Static friction.
         if abs(v) < veh.ϵ and abs(Fd - F_grav) <= F_roll:
@@ -101,12 +102,16 @@ class VehicleDynamics:
         )
 
 
-    def deramp_ref(self, t: float, vref: float | None = None) -> float:
+    def deramp_ref(self, t: float, t_break: float, vref: float | None = None) -> float:
         """Linear downward setpoint ramp.
 
-        The setpoint decreases linearly with slope a_max, starting from t0,
-        and is lower-bounded by 0 so that it never becomes negative.
+        The setpoint decreases linearly toward 0 with slope a_max, starting from
+        t_break, and is clamped at 0 so that it does not overshoot.
         """
         veh = self.params
         vref = veh.v_work if vref is None else vref
-        return max(-veh.a_max * (t - veh.t0), 0)
+        return (
+            max(vref - veh.a_max * (t - t_break), 0.0)
+            if vref >= 0.0 else
+            min(vref + veh.a_max * (t - t_break), 0.0)
+        )

@@ -42,6 +42,7 @@ class VehicleModel(_BaseSchema):
 
 class MotorSettings(_BaseSchema):
     """DC motor and gearing specifications."""
+    Jm: float = Field(default=9.51e-2, gt=0, description="Motor intertia")
     ω_nom: float = Field(default=168.2, gt=0, validation_alias=AliasChoices("ω_nom", "omega_nom", "w_nom"), description="Nominal rotational speed [rad/s]")
     T_nom: float = Field(default=100.0, gt=0, description="Nominal torque [N·m]")
     Kt: float = Field(default=1.542, gt=0, description="Torque constant = voltage constant [N·m/A = V·s/rad]")

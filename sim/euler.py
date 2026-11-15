@@ -22,6 +22,8 @@ def step_method(
     settings: Settings,
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
+    stop_at_end: bool = False,
+    silent: bool = True
 ) -> EulerSim:
     """Euler step method for vehicle with DC motor."""
 
@@ -37,7 +39,7 @@ def step_method(
     N = round((tf - t0)/dt)             # Number of steps
     Ts = n_ctrl * dt                    # Controller sample time
 
-    manual = True if not sensor and not controller else False
+    manual = True if sensor is False and controller is False else False
 
     # controller: True -> Default, False -> None
     if controller is True:
@@ -58,14 +60,23 @@ def step_method(
     x[0], y[0], α[0], v[0], a[0] = x0, y0, α0, v0, a0
 
     cmd = 0.0
+    t_break: float | None = None
+    v_break: float | None = None
 
-    print_welcome(settings, controller or None, sensor or None)
+    if not silent:
+        print_welcome(settings, controller or None, sensor or None)
 
     # Start Euler's step method
     for k in range(N + 1):
         α[k] = road.slope(s[k])
 
-        vr[k] = ramp_ref(t[k]) if not manual else vref
+        # Inside the simulation loop
+        if stop_at_end and t[k] >= t0 + 0.92 * (tf - t0):
+            t_break = t_break or t[k]
+            v_break = v_break or vr[k - 1] if k > 0 else ramp_ref(t[0])
+            vr[k] = deramp_ref(t[k], t_break, v_break) # type: ignore
+        else:
+            vr[k] = ramp_ref(t[k]) if not manual else vref
 
         # The sensor is read "continuously" (every step) unless set to False
         vm[k] = sensor.measure_velocity(v[k], t[k])
