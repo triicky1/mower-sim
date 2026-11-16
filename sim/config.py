@@ -10,6 +10,8 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 type DynamicsModel = Callable[[float, float, float], tuple[float, float, float, float]]
 type ControlMode = Literal["voltage", "current"]
 
+from numpy import clip
+
 # TODO:
 # class SensorSettings(_BaseSchema): ...
 # class ControllerSettings(_BaseSchema): ...
@@ -108,12 +110,12 @@ class Settings(Params):
 
     def get_control_limits(self, mode: ControlMode, v: float = 0.0) -> tuple[float, float]:
         ω = self.i2or * v / self.r
-        u_max = self.U_nom * self.u_frac
+        u_nom = self.U_nom * self.u_frac
         i_min = self.I_min * self.i_frac
         i_max = self.I_max * self.i_frac
 
         if self.open_loop and mode == "voltage":
-            return -u_max, u_max
+            return -u_nom, u_nom
 
         if self.open_loop and mode == "current":
             return i_min, i_max
@@ -121,12 +123,18 @@ class Settings(Params):
 
         match mode:
             case "current":
-                lo = max(i_min, (-u_max - self.Kt * ω) / self.Ra)
-                hi = min(i_max, (u_max - self.Kt * ω) / self.Ra)
+                # Ia_limits = (|U_nom| - Kt * ω(t)) / Ra
+                Ia_min = (-u_nom - self.Kt * ω) / self.Ra
+                Ia_max = (u_nom - self.Kt * ω) / self.Ra
+                lo = float(clip(i_min, Ia_min, Ia_max))
+                hi = float(clip(i_max, Ia_min, Ia_max))
                 return lo, hi
             case "voltage":
-                lo = max(-u_max, self.Kt * ω + self.Ra * i_min)
-                hi = min(u_max, self.Kt * ω + self.Ra * i_max)
+                # Ua_limits = Kt * ω(t) + Ra * |I_max|
+                Ua_min = self.Kt * ω + self.Ra * i_min
+                Ua_max = self.Kt * ω + self.Ra * i_max
+                lo = float(clip(Ua_min, -u_nom, u_nom))
+                hi = float(clip(Ua_max, -u_nom, u_nom))
                 return lo, hi
             case _:
                 raise ValueError(f"Unknown control mode ¯\\_(ツ)_/¯: {mode}")
