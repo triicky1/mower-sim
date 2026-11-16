@@ -30,7 +30,7 @@ def live(Kp=54.0, Ki=40.0, v_max=float('inf'), dt=0.001):
         (20.0,   0.0),                                      # finish
     )
 
-    res = run_live(road, vehicle.dynamics_current, "current", settings)
+    res = run_live(road, vehicle.dynamics_current, settings)
 
     plot_dashboard(
         res,

@@ -14,18 +14,29 @@ from .write import print_welcome
 
 type StepInput = float | LiveCommand | None
 
+def _get_mode(f: DynamicsModel) -> ControlMode:
+    match f.__name__:
+        case "dynamics_current":
+            mode = "current"
+        case "dynamics_voltage":
+            mode = "voltage"
+        case _:
+            raise ValueError(f"Dynamics model '{f.__name__}' not supported")
+    return mode
+
 
 def step_method(
     road: RoadProfile,
     f: DynamicsModel,
-    mode: ControlMode,
     settings: Settings,
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
     stop_at_end: bool = False,
-    silent: bool = True
+    silent: bool = False
 ) -> EulerSim:
     """Euler step method for vehicle with DC motor."""
+
+    mode = _get_mode(f)
 
     t0, tf, dt = settings.t0, settings.tf, settings.dt
     x0, y0, α0, v0, a0 = settings.x0, settings.y0, settings.α0, settings.v0, settings.a0
@@ -44,6 +55,7 @@ def step_method(
     # controller: True -> Default, False -> None
     if controller is True:
         controller = Controller(Kp, Ki, Kd, Ts)
+        controller.reset()
     elif isinstance(controller, Controller):
         controller.reset()
 
@@ -109,12 +121,13 @@ def step_method(
 def step_method_forever(
     road: RoadProfile,
     f: DynamicsModel,
-    mode: ControlMode,
     settings: Settings,
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
 ) -> Generator[EulerStep, StepInput, EulerSim]:
     """Euler step method as a generator for infinite real-time simulation."""
+    mode = _get_mode(f)
+
     t0, dt = settings.t0, settings.dt
     s_k = 0.0
     x_k, y_k, α_k, v_k, a_k = (
@@ -186,27 +199,18 @@ def step_method_forever(
             a_k, Ia_k, Ua_k, Fd_k = f(v_k, u_k, α_k)
 
             step = EulerStep(
-                t=t_k,
-                s=s_k,
-                x=x_k,
-                y=y_k,
-                α=α_k,
-                v=v_k,
-                vm=vm_k,
-                vr=vr_k,
-                a=a_k,
-                Ia=Ia_k,
-                Ua=Ua_k,
-                Fd=Fd_k,
+                t=t_k, s=s_k, x=x_k, y=y_k, α=α_k, v=v_k, vm=vm_k,
+                vr=vr_k, a=a_k, Ia=Ia_k, Ua=Ua_k, Fd=Fd_k,
             )
             history.append(step)
 
             cmd = yield step
 
-            v_k = v_k + a_k * dt
+            # Explicit Euler: positions use v_k from this step, then v is updated
             s_k = s_k + v_k * dt
-            x_k = x_k + v[k] * np.cos(α_k) * dt if False else x_k + v_k * np.cos(α_k) * dt
+            x_k = x_k + v_k * np.cos(α_k) * dt
             y_k = y_k + v_k * np.sin(α_k) * dt
+            v_k = v_k + a_k * dt
 
     except (GeneratorExit, StopIteration):
         pass

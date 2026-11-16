@@ -4,7 +4,6 @@
 import numpy as np
 import pytest # pytest-9.2.0
 
-from main import ROAD
 from sim import (
     AMT102VSensor,
     Controller,
@@ -13,6 +12,22 @@ from sim import (
     Settings,
     VehicleDynamics,
     step_method,
+)
+
+ROAD = RoadProfile(
+    (20, 0),
+    (10, 1),
+    (10, 2),
+    (10, 3),
+    (10, 4),
+    (10, 5),
+    (50, 0),
+    (10, -5),
+    (10, -4),
+    (10, -3),
+    (10, -2),
+    (10, -1),
+    (20, 0),
 )
 
 
@@ -118,8 +133,8 @@ def test_euler_simulation_current_and_voltage():
     cfg = Settings(tf=35.0, dt=0.01, Kp=50.0, Ki=50.0, n_ctrl=1)
     dyn = VehicleDynamics(cfg)
 
-    sim_i = step_method(ROAD, dyn.dynamics_current, "current", cfg)
-    sim_u = step_method(ROAD, dyn.dynamics_voltage, "voltage", cfg)
+    sim_i = step_method(ROAD, dyn.dynamics_current, cfg)
+    sim_u = step_method(ROAD, dyn.dynamics_voltage, cfg)
 
     for mode_name, sim in [("current", sim_i), ("voltage", sim_u)]:
         # Inga NaN eller Inf

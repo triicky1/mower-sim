@@ -6,7 +6,6 @@ import numpy as np
 import pygame
 
 from sim import (
-    ControlMode,
     DynamicsModel,
     EulerSim,
     EulerStep,
@@ -15,6 +14,7 @@ from sim import (
     Settings,
     step_method_forever,
 )
+from sim.euler import _get_mode
 
 BG_COLOR = (22, 26, 29)
 PANEL_BG = (30, 35, 38)
@@ -194,11 +194,12 @@ def _draw_world(
 def run_live(
     road: RoadProfile,
     f: DynamicsModel,
-    mode: ControlMode,
     settings: Settings,
     window_size: tuple[int, int] = (1200, 760),
 ) -> EulerSim:
     """Runs interactive real-time simulation in Pygame and returns EulerSim."""
+    mode = _get_mode(f)
+
     pygame.init()
     screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
     pygame.display.set_caption(f"Vehicle Simulator Live ({mode})")
@@ -207,7 +208,7 @@ def run_live(
     font = pygame.font.SysFont("monospace", 14)
     font_bold = pygame.font.SysFont("monospace", 15, bold=True)
 
-    sim = step_method_forever(road, f, mode, settings)
+    sim = step_method_forever(road, f, settings)
     step = next(sim)
 
     dt = settings.dt
