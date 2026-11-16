@@ -1,5 +1,20 @@
-from .scada import plot_comparison, plot_dashboard, plot_sensor_effect, plot_transients, plot_sensor_fft
+# hmi/__init__.py
 from .live import run_live
+from .scada import (
+    plot_comparison,
+    plot_dashboard,
+    plot_sensor_effect,
+    plot_sensor_fft,
+    plot_transients,
+)
 
-__all__ = ["plot_dashboard", "plot_comparison", "plot_sensor_effect",
-           "plot_transients", "plot_sensor_fft", "run_live"]
+__all__ = [
+    # live.py
+    "run_live",
+    # scada.py
+    "plot_comparison",
+    "plot_dashboard",
+    "plot_sensor_effect",
+    "plot_sensor_fft",
+    "plot_transients",
+]
