@@ -365,7 +365,8 @@ def run_live(
         r_i = pygame.Rect(16, charts_top + half_h + 12, half_w, half_h)
         r_u = pygame.Rect(28 + half_w, charts_top + half_h + 12, half_w, half_h)
 
-        v_span = max(settings.v_work * 1.4, max((abs(x) for x in v_buf), default=5.0) * 1.2)
+        v_cap = settings.v_work if math.isfinite(settings.v_work) else 0.0
+        v_span = max(v_cap * 1.4, max((abs(x) for x in v_buf), default=5.0) * 1.2, 1.0)
         _draw_strip_chart(
             screen,
             r_v,
