@@ -1,18 +1,18 @@
 # Mower Simulator
 
-2D longitudinal vehicle dynamics simulator for a DC-motor-driven mower using forward Euler integration, discrete PID control, and a CUI AMT102-V quadrature encoder model.
+2D longitudinal vehicle dynamics simulator for a DC-motor-driven vehicle using forward Euler integration, discrete PID control, and a custom CUI AMT102-V quadrature encoder model.
 
 ## Installation
 
 ```bash
 git clone [https://github.com/triicky1/mower-sim](https://github.com/triicky1/mower-sim)
 cd mower-sim
-pip install -r requirements.txt
 ```
 
-## Verify that everything works
+## Install dependencies and verify that everything works
 
 ```bash
+pip install -r requirements.txt
 pytest
 ```
 
@@ -85,7 +85,16 @@ encoder = AMT102VSensor(
 )
 
 # Run simulation ("current" or "voltage" control mode)
-sim = step_method(road, dyn.dynamics_current, "current", cfg, sensor=encoder)
+sim = step_method(
+    road=road,
+    f=dyn.dynamics_current,
+    mode="current",
+    settings=cfg,
+    sensor=encoder,         # AMT102VSensor | bool. True: default sensor, False: sensor without quantization
+    # controller=True,      # Controller | bool. True: default PI(D) from `cfg` parameters, False: open-loop
+    # stop_at_end=False,    # bool. True: brake when the simulation reaches 92% of its duration, default=False
+    # silent=False,         # bool. True: suppress simulation information, default=False
+)
 
 # Print terminal metrics and plot results
 summarize(sim, "Custom Course", cfg)
