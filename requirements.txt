@@ -1,3 +1,5 @@
 pytest
 pydantic
 pygame
+matplotlib.pyplot
+numpy

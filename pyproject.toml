@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vehicle-simulator"
+version = "0.0.1"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "matplotlib>=3.8",
+    "pygame>=2.5",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["sim", "hmi", "examples"]
+py-modules = ["plotkit"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources.*",
+    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+    "ignore::pytest.PytestRemovedIn10Warning",
+    "ignore:Your system is avx2 capable but pygame was not built with support for it:RuntimeWarning",
+]

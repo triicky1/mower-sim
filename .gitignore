@@ -7,7 +7,6 @@
 *$py.class
 
 # Pytest artifacts och konfigurationer
-pyproject.toml
 .pytest_cache/
 .tox/
 .nox/
