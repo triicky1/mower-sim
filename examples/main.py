@@ -8,7 +8,7 @@ if __name__ == "__main__":
     try:
         if "live" in sys.argv[1:]:
             from examples.live import live
-            live()
+            live(funmode = 'funmode' in sys.argv[1:])
         else:
             from examples.batch import main
             main()

@@ -87,19 +87,17 @@ class VehicleDynamics:
         return a, Ia, u, Fd
 
 
-    def ramp_ref(self, t: float, vref: float | None = None) -> float:
-        """Linear upward setpoint ramp.
+    def ramp_ref(self, vr_prev: float, dt: float, vref: float | None = None) -> float:
+        """Rate-limited setpoint.
 
-        The setpoint increases linearly from 0 with slope a_max, starting from
-        the start time t0, and is upper-bounded by the working speed v_work.
+        Moves the previous setpoint toward the target (the segment limit `vref`,
+        or v_work if None) by at most a_max*dt per step, so the target can change
+        at any time without the setpoint jumping.
         """
         veh = self.params
-        vref = vref or veh.v_work
-        return (
-            min(veh.a_max * (t - veh.t0), vref)
-            if vref > 0.0 else
-            max(-veh.a_max * (t - veh.t0), vref)
-        )
+        target = veh.v_work if vref is None else vref
+        step = veh.a_max * dt
+        return vr_prev + max(-step, min(step, target - vr_prev))
 
 
     def deramp_ref(self, t: float, t_break: float, vref: float | None = None) -> float:

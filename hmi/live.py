@@ -196,9 +196,17 @@ def run_live(
     f: DynamicsModel,
     settings: Settings,
     window_size: tuple[int, int] = (1200, 760),
+    funmode: bool = False,
 ) -> EulerSim:
     """Runs interactive real-time simulation in Pygame and returns EulerSim."""
     mode = _get_mode(f)
+
+    if abs(settings.vref) == float('inf') and funmode:
+        settings.a_max = float('inf')
+        settings.a_min = -float('inf')
+        settings.I_max = float('inf')
+        settings.I_min = -float('inf')
+        settings.U_nom = float('inf')
 
     pygame.init()
     screen = pygame.display.set_mode(window_size, pygame.RESIZABLE)
@@ -365,7 +373,8 @@ def run_live(
         r_i = pygame.Rect(16, charts_top + half_h + 12, half_w, half_h)
         r_u = pygame.Rect(28 + half_w, charts_top + half_h + 12, half_w, half_h)
 
-        v_span = max(settings.v_work * 1.4, max((abs(x) for x in v_buf), default=5.0) * 1.2)
+        v_cap = settings.v_work if math.isfinite(settings.v_work) else 0.0
+        v_span = max(v_cap * 1.4, max((abs(x) for x in v_buf), default=5.0) * 1.2, 1.0)
         _draw_strip_chart(
             screen,
             r_v,

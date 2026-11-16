@@ -9,7 +9,7 @@ from hmi import plot_dashboard, run_live
 from sim import RoadProfile, Settings, VehicleDynamics
 
 
-def live(Kp=54.0, Ki=40.0, v_max=float('inf'), dt=0.001):
+def live(funmode=False, Kp=54.0, Ki=40.0, v_max=float('inf'), dt=0.001):
     plk.apply_style("clean")
     plk.apply_style("grid")
 
@@ -30,7 +30,7 @@ def live(Kp=54.0, Ki=40.0, v_max=float('inf'), dt=0.001):
         (20.0,   0.0),                                      # finish
     )
 
-    res = run_live(road, vehicle.dynamics_current, settings)
+    res = run_live(road, vehicle.dynamics_current, settings, funmode=funmode)
 
     plot_dashboard(
         res,

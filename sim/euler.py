@@ -32,7 +32,8 @@ def step_method(
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
     stop_at_end: bool = False,
-    silent: bool = False
+    silent: bool = False,
+    funmode: bool = False,
 ) -> EulerSim:
     """Euler step method for vehicle with DC motor."""
 
@@ -46,6 +47,13 @@ def step_method(
     vref = settings.vref or settings.v_work
     deramp_ref = VehicleDynamics(settings).deramp_ref
     ramp_ref = VehicleDynamics(settings).ramp_ref
+
+    if abs(vref) == float('inf') and funmode:
+        settings.a_max = float('inf')
+        settings.a_min = -float('inf')
+        settings.I_max = float('inf')
+        settings.I_min = -float('inf')
+        settings.U_nom = float('inf')
 
     N = round((tf - t0)/dt)             # Number of steps
     Ts = n_ctrl * dt                    # Controller sample time
@@ -72,8 +80,7 @@ def step_method(
     x[0], y[0], α[0], v[0], a[0] = x0, y0, α0, v0, a0
 
     cmd = 0.0
-    t_break: float | None = None
-    v_break: float | None = None
+    vr_prev = 0.0
 
     if not silent:
         print_welcome(settings, controller or None, sensor or None)
@@ -82,13 +89,14 @@ def step_method(
     for k in range(N + 1):
         α[k] = road.slope(s[k])
 
-        # Inside the simulation loop
-        if stop_at_end and t[k] >= t0 + 0.92 * (tf - t0):
-            t_break = t_break or t[k]
-            v_break = v_break or vr[k - 1] if k > 0 else ramp_ref(t[0])
-            vr[k] = deramp_ref(t[k], t_break, v_break) # type: ignore
+        braking = stop_at_end and t[k] >= t0 + 0.92 * (tf - t0)
+        v_lim = 0.0 if braking else road.vref(s[k])
+
+        if manual and not braking:
+            vr[k] = vref if v_lim is None else v_lim
         else:
-            vr[k] = ramp_ref(t[k]) if not manual else vref
+            vr[k] = ramp_ref(vr_prev, dt, v_lim)
+        vr_prev = vr[k]
 
         # The sensor is read "continuously" (every step) unless set to False
         vm[k] = sensor.measure_velocity(v[k], t[k])
@@ -124,9 +132,17 @@ def step_method_forever(
     settings: Settings,
     controller: Controller | bool = True,
     sensor: AMT102VSensor | bool = True,
+    funmode: bool =  False,
 ) -> Generator[EulerStep, StepInput, EulerSim]:
     """Euler step method as a generator for infinite real-time simulation."""
     mode = _get_mode(f)
+
+    if abs(settings.v_work) == float('inf') and funmode:
+        settings.a_max = float('inf')
+        settings.a_min = -float('inf')
+        settings.I_max = float('inf')
+        settings.I_min = -float('inf')
+        settings.U_nom = float('inf')
 
     t0, dt = settings.t0, settings.dt
     s_k = 0.0
@@ -158,15 +174,17 @@ def step_method_forever(
 
     history: list[EulerStep] = []
     u_cmd = 0.0
+    vr_k = 0.0
     cmd: StepInput = None
 
     try:
         for k in itertools.count():
             t_k = t0 + k * dt
+            vr_prev = vr_k
 
             if isinstance(cmd, LiveCommand):
                 α_k = cmd.α if cmd.α is not None else road.slope(s_k)
-                vr_k = cmd.vr if cmd.vr is not None else ramp_ref(t_k, road.vref(s_k))
+                vr_k = cmd.vr if cmd.vr is not None else ramp_ref(vr_prev, dt, road.vref(s_k))
                 u_manual = cmd.u_manual
             elif isinstance(cmd, (int, float)):
                 α_k = road.slope(s_k)
@@ -174,7 +192,7 @@ def step_method_forever(
                 u_manual = None
             else:
                 α_k = road.slope(s_k)
-                vr_k = ramp_ref(t_k, road.vref(s_k))
+                vr_k = ramp_ref(vr_prev, dt, road.vref(s_k))
                 u_manual = None
 
             vm_k = sensor.measure_velocity(v_k, t_k) if sensor else v_k
